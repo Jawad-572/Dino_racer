@@ -1,0 +1,1541 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Dino Rider: Jurassic Race</title>
+<style>
+  html,body{margin:0;padding:0;overflow:hidden;background:#000;font-family:'Segoe UI',Arial,sans-serif;height:100%;width:100%;touch-action:none;}
+  #gameCanvas{display:block;position:fixed;top:0;left:0;}
+
+  /* ---------- HUD ---------- */
+  #hud{position:fixed;top:0;left:0;width:100%;pointer-events:none;z-index:5;}
+  #hud .row{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;box-sizing:border-box;}
+  #distanceWrap{color:#fff;font-size:15px;text-shadow:0 2px 4px #000;}
+  #distanceBarBg{width:140px;height:8px;background:rgba(255,255,255,0.25);border-radius:4px;margin-top:4px;overflow:hidden;}
+  #distanceBarFill{height:100%;width:0%;background:linear-gradient(90deg,#ffd166,#ef476f);border-radius:4px;}
+  #hearts{color:#ff4d6d;font-size:20px;text-shadow:0 2px 4px #000;letter-spacing:3px;}
+  #rank{color:#fff;font-size:22px;font-weight:800;text-shadow:0 2px 4px #000;text-align:right;}
+  #boostWrap{position:fixed;bottom:26px;left:50%;transform:translateX(-50%);width:200px;z-index:5;pointer-events:none;}
+  #boostBarBg{width:100%;height:12px;background:rgba(255,255,255,0.25);border-radius:6px;overflow:hidden;border:1px solid rgba(255,255,255,0.4);}
+  #boostBarFill{height:100%;width:0%;background:linear-gradient(90deg,#06d6a0,#118ab2);}
+  #boostLabel{color:#fff;font-size:11px;text-align:center;text-shadow:0 2px 3px #000;margin-top:2px;letter-spacing:1px;}
+
+  /* ---------- touch buttons ---------- */
+  #touchControls{position:fixed;bottom:0;left:0;width:100%;height:150px;z-index:6;display:none;}
+  .tbtn{position:absolute;bottom:18px;width:64px;height:64px;border-radius:50%;background:rgba(255,255,255,0.15);border:2px solid rgba(255,255,255,0.5);color:#fff;font-size:26px;display:flex;align-items:center;justify-content:center;user-select:none;}
+  #btnLeft{left:16px;}
+  #btnRight{left:96px;}
+  #btnJump{right:96px;}
+  #btnBoost{right:16px;background:rgba(6,214,160,0.25);border-color:#06d6a0;}
+
+  /* ---------- overlays ---------- */
+  .overlay{position:fixed;top:0;left:0;width:100%;height:100%;z-index:20;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:#fff;box-sizing:border-box;padding:20px;background:radial-gradient(circle at 50% 30%,#1c2b1a 0%,#0a0f08 100%);}
+  .hidden{display:none!important;}
+  h1.title{font-size:34px;margin:0 0 4px;letter-spacing:1px;color:#ffd166;text-shadow:0 3px 6px #000;}
+  .subtitle{font-size:13px;color:#c9d6c2;margin-bottom:22px;letter-spacing:2px;}
+  .stageCard{width:88%;max-width:340px;margin:8px 0;padding:14px 16px;border-radius:14px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);display:flex;justify-content:space-between;align-items:center;}
+  .stageCard.locked{opacity:0.4;}
+  .stageInfo{text-align:left;}
+  .stageInfo b{font-size:16px;display:block;}
+  .stageInfo span{font-size:11px;color:#b7c4ae;}
+  .goBtn{background:linear-gradient(135deg,#ef476f,#ffd166);border:none;color:#161616;font-weight:800;padding:9px 16px;border-radius:20px;font-size:13px;}
+  .lockIcon{font-size:20px;}
+  .bigBtn{margin-top:18px;background:linear-gradient(135deg,#06d6a0,#118ab2);border:none;color:#fff;font-weight:800;padding:14px 30px;border-radius:26px;font-size:16px;letter-spacing:1px;}
+  .smallNote{font-size:11px;color:#8a9881;margin-top:20px;max-width:300px;line-height:1.5;}
+  #resultTitle{font-size:28px;color:#ffd166;margin-bottom:6px;}
+  #resultStats{font-size:14px;line-height:1.8;color:#e8efe2;margin-bottom:14px;}
+</style>
+</head>
+<body>
+
+<canvas id="gameCanvas"></canvas>
+
+<div id="hud" class="hidden">
+  <div class="row">
+    <div id="distanceWrap">DISTANCE<br><span id="distText">0</span> m
+      <div id="distanceBarBg"><div id="distanceBarFill"></div></div>
+    </div>
+    <div id="rank">1st</div>
+  </div>
+  <div class="row" style="justify-content:flex-start;">
+    <div id="hearts">❤❤❤</div>
+  </div>
+</div>
+
+<div id="boostWrap" class="hidden">
+  <div id="boostBarBg"><div id="boostBarFill"></div></div>
+  <div id="boostLabel">BOOST</div>
+</div>
+
+<div id="touchControls">
+  <div class="tbtn" id="btnLeft">◀</div>
+  <div class="tbtn" id="btnRight">▶</div>
+  <div class="tbtn" id="btnJump">⤒</div>
+  <div class="tbtn" id="btnBoost">⚡</div>
+</div>
+
+<!-- MAIN MENU -->
+<div id="menuOverlay" class="overlay">
+  <h1 class="title">🦖 DINO RIDER</h1>
+  <div class="subtitle">RACE THROUGH THE ANCIENT WORLD</div>
+  <div id="stageList"></div>
+  <div class="smallNote">Swipe left/right to change lane, swipe up or tap ⤒ to jump over obstacles, collect orange orbs to fill your boost meter, tap ⚡ to unleash it. Survive 3 hits and you're out!</div>
+</div>
+
+<!-- STAGE INTRO -->
+<div id="introOverlay" class="overlay hidden">
+  <h1 class="title" id="introTitle">STAGE</h1>
+  <div class="subtitle" id="introSubtitle">LOCATION</div>
+  <button class="bigBtn" id="startRaceBtn">START RACE</button>
+</div>
+
+<!-- RESULT -->
+<div id="resultOverlay" class="overlay hidden">
+  <div id="resultTitle">STAGE COMPLETE</div>
+  <div id="resultStats"></div>
+  <button class="bigBtn" id="nextBtn">CONTINUE</button>
+  <button class="bigBtn" id="retryBtn" style="background:linear-gradient(135deg,#ef476f,#ffd166);margin-top:10px;">RETRY</button>
+  <button class="bigBtn" id="menuBtn" style="background:rgba(255,255,255,0.15);margin-top:10px;">MAIN MENU</button>
+</div>
+
+<div id="loadError" class="overlay hidden" style="z-index:99;">
+  <h1 class="title" style="color:#ef476f;">⚠ CONNECTION ISSUE</h1>
+  <div class="subtitle" style="max-width:320px;line-height:1.6;">Couldn't load the 3D engine. Check your internet connection and reload the page.</div>
+</div>
+<script>
+// Resilient loader: tries several CDNs in order since a single CDN can be
+// blocked or unreachable depending on network/region.
+(function loadThree(urls, i){
+  i = i || 0;
+  if(i >= urls.length){
+    document.getElementById('loadError').classList.remove('hidden');
+    return;
+  }
+  var s = document.createElement('script');
+  s.src = urls[i];
+  s.onload = function(){ window.__gameInit && window.__gameInit(); };
+  s.onerror = function(){ loadThree(urls, i+1); };
+  document.head.appendChild(s);
+})([
+  'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js',
+  'https://unpkg.com/three@0.160.0/build/three.min.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/three.js/r160/three.min.js'
+]);
+</script>
+<script>
+window.__gameInit = function(){
+"use strict";
+
+/* ========================================================================
+   DINO RIDER — single file HTML5 / Three.js endless-lane racing game
+   3 stages, 3 Jurassic locations. Built for PWABuilder -> TWA -> Play Store.
+   ======================================================================== */
+
+const SAVE_KEY = "dinoRider_save_v1";
+function loadSave(){
+  try{ return JSON.parse(localStorage.getItem(SAVE_KEY)) || {unlocked:1,best:{}}; }
+  catch(e){ return {unlocked:1,best:{}}; }
+}
+function writeSave(s){ localStorage.setItem(SAVE_KEY, JSON.stringify(s)); }
+let save = loadSave();
+
+const STAGES = [
+  {
+    id:0, name:"Ember City", desc:"Ash-stained stone streets under a smoke-red sky",
+    fog:0x2a1210, bg:0x160705, ground:0x6b4a35, ground2:0x543823,
+    accent:0xff6b35, goal:1200, obstacle:0x4a3128, wallColor:0x2c1c14,
+    buildingColor:0x5a4030, bandColor:0x3a2418, bannerA:0xb0432f, bannerB:0xe8d9b8,
+  },
+  {
+    id:1, name:"Ruined Jungle Temple", desc:"Vine-choked ruins swallowed by mist",
+    fog:0x1c3324, bg:0x0b160f, ground:0x5c5b3f, ground2:0x484731,
+    accent:0x9be564, goal:1500, obstacle:0x3d5a3a, wallColor:0x2c3320,
+    buildingColor:0x51503a, bandColor:0x2f3a22, bannerA:0x2f6b4a, bannerB:0xd8cf9a,
+    skyImage:"jungle_sky.jpg",
+  },
+  {
+    id:2, name:"Sandstone Arena City", desc:"A sunbaked capital roaring with racing crowds",
+    fog:0x9a7a4d, bg:0x6b8fae, ground:0xc9a876, ground2:0xb08f5e,
+    accent:0xffd166, goal:1800, obstacle:0x6b4423, wallColor:0x8a6a45,
+    buildingColor:0xc9a876, bandColor:0x8a6a45, bannerA:0x2a5f8a, bannerB:0xf2ead6,
+  }
+];
+
+const LANE_X = [-3, 0, 3];
+const LANE_COUNT = 3;
+
+/* ---------------- Procedural sound (no audio files, WebAudio synth) ---------------- */
+const SFX = (function(){
+  let ctx = null;
+  function unlock(){
+    if(!ctx){
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if(AC) ctx = new AC();
+    }
+    if(ctx && ctx.state === 'suspended') ctx.resume();
+  }
+  window.addEventListener('touchstart', unlock, {once:true});
+  window.addEventListener('click', unlock, {once:true});
+
+  function tone(freq, dur, type, vol, glide){
+    if(!ctx) return;
+    const t0 = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = type || 'sine';
+    osc.frequency.setValueAtTime(freq, t0);
+    if(glide) osc.frequency.exponentialRampToValueAtTime(Math.max(20,glide), t0+dur);
+    gain.gain.setValueAtTime(vol||0.2, t0);
+    gain.gain.exponentialRampToValueAtTime(0.001, t0+dur);
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.start(t0); osc.stop(t0+dur);
+  }
+  function noiseBurst(dur, vol){
+    if(!ctx) return;
+    const t0 = ctx.currentTime;
+    const bufSize = ctx.sampleRate*dur;
+    const buf = ctx.createBuffer(1, bufSize, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for(let i=0;i<bufSize;i++) data[i] = (Math.random()*2-1) * (1 - i/bufSize);
+    const src = ctx.createBufferSource(); src.buffer = buf;
+    const gain = ctx.createGain(); gain.gain.setValueAtTime(vol||0.25, t0);
+    src.connect(gain); gain.connect(ctx.destination);
+    src.start(t0);
+  }
+  return {
+    jump(){ tone(420,0.18,'triangle',0.22,700); },
+    land(){ tone(160,0.1,'sine',0.15,90); },
+    hit(){ noiseBurst(0.25,0.35); tone(120,0.3,'sawtooth',0.2,50); },
+    collect(){ tone(880,0.09,'sine',0.18,1300); },
+    boost(){ tone(200,0.35,'sawtooth',0.2,900); },
+    laneSwitch(){ tone(500,0.06,'square',0.08,600); },
+    stageComplete(){ [523,659,784,1046].forEach((f,i)=>setTimeout(()=>tone(f,0.3,'sine',0.2),i*110)); },
+    crash(){ noiseBurst(0.4,0.35); tone(90,0.5,'sawtooth',0.22,30); },
+    click(){ tone(600,0.05,'square',0.06,600); }
+  };
+})();
+
+/* ---------------- Three.js core ---------------- */
+const canvas = document.getElementById('gameCanvas');
+const renderer = new THREE.WebGLRenderer({canvas, antialias:true, powerPreference:'high-performance'});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.15;
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(52, window.innerWidth/window.innerHeight, 0.1, 500);
+
+function resize(){
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  camera.aspect = window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', resize);
+resize();
+
+const hemi = new THREE.HemisphereLight(0xffffff, 0x223322, 0.9);
+scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xffffff, 1.1);
+sun.position.set(6,14,8);
+sun.castShadow = true;
+sun.shadow.mapSize.set(1024,1024);
+sun.shadow.camera.left=-20; sun.shadow.camera.right=20;
+sun.shadow.camera.top=20; sun.shadow.camera.bottom=-20;
+sun.shadow.bias = -0.0025;
+scene.add(sun);
+const fill = new THREE.DirectionalLight(0x9fc7ff, 0.35);
+fill.position.set(-8,6,-4);
+scene.add(fill);
+const rim = new THREE.DirectionalLight(0xffe3b0, 0.5);
+rim.position.set(0,5,-10);
+scene.add(rim);
+
+/* ---------------- Procedural scaly-skin textures ---------------- */
+const _texCache = {};
+function hexToRgb(hex){ const c=new THREE.Color(hex); return [Math.round(c.r*255),Math.round(c.g*255),Math.round(c.b*255)]; }
+function shade(rgb, amt){ return `rgb(${Math.max(0,Math.min(255,rgb[0]+amt))},${Math.max(0,Math.min(255,rgb[1]+amt))},${Math.max(0,Math.min(255,rgb[2]+amt))})`; }
+
+function makeSkinTextures(baseHex){
+  if(_texCache[baseHex]) return _texCache[baseHex];
+  const rgb = hexToRgb(baseHex);
+  const size = 512;
+
+  // --- color map: mottled base + scale dapples ---
+  const c1 = document.createElement('canvas'); c1.width=c1.height=size;
+  const ctx1 = c1.getContext('2d');
+  ctx1.fillStyle = shade(rgb,0); ctx1.fillRect(0,0,size,size);
+  // soft blotches (natural color variation)
+  for(let i=0;i<90;i++){
+    const r = 18+Math.random()*55;
+    const x = Math.random()*size, y = Math.random()*size;
+    const dark = Math.random()<0.5;
+    ctx1.fillStyle = shade(rgb, dark ? -(18+Math.random()*22) : (14+Math.random()*18));
+    ctx1.globalAlpha = 0.32;
+    ctx1.beginPath(); ctx1.ellipse(x,y,r,r*0.6,Math.random()*Math.PI,0,Math.PI*2); ctx1.fill();
+  }
+  ctx1.globalAlpha = 1;
+  // scale rows (offset brick-like ellipses) — finer detail at 512px
+  const scaleR = 9, rowH = 17;
+  for(let row=0; row<size; row+=rowH){
+    const offset = (row/rowH)%2===0 ? 0 : scaleR;
+    for(let col=-scaleR; col<size+scaleR*2; col+=scaleR*2){
+      ctx1.strokeStyle = shade(rgb,-26);
+      ctx1.lineWidth = 1;
+      ctx1.globalAlpha = 0.28;
+      ctx1.beginPath();
+      ctx1.ellipse(col+offset,row,scaleR,scaleR*0.8,0,0,Math.PI*2);
+      ctx1.stroke();
+    }
+  }
+  ctx1.globalAlpha=1;
+  // underbelly hint (lighter band)
+  const grad = ctx1.createLinearGradient(0,size*0.65,0,size);
+  grad.addColorStop(0,'rgba(0,0,0,0)');
+  grad.addColorStop(1, shade(rgb, 45));
+  ctx1.fillStyle = grad;
+  ctx1.fillRect(0,size*0.6,size,size*0.4);
+
+  const colorMap = new THREE.CanvasTexture(c1);
+  colorMap.wrapS = colorMap.wrapT = THREE.RepeatWrapping;
+  colorMap.repeat.set(2,2);
+  colorMap.colorSpace = THREE.SRGBColorSpace;
+
+  // --- roughness map: subtle scale bump variation ---
+  const c2 = document.createElement('canvas'); c2.width=c2.height=size;
+  const ctx2 = c2.getContext('2d');
+  ctx2.fillStyle = '#9a9a9a'; ctx2.fillRect(0,0,size,size);
+  for(let row=0; row<size; row+=rowH){
+    const offset = (row/rowH)%2===0 ? 0 : scaleR;
+    for(let col=-scaleR; col<size+scaleR*2; col+=scaleR*2){
+      ctx2.fillStyle = Math.random()<0.5 ? '#7a7a7a' : '#b5b5b5';
+      ctx2.beginPath();
+      ctx2.ellipse(col+offset,row,scaleR*0.85,scaleR*0.7,0,0,Math.PI*2);
+      ctx2.fill();
+    }
+  }
+  const roughMap = new THREE.CanvasTexture(c2);
+  roughMap.wrapS = roughMap.wrapT = THREE.RepeatWrapping;
+  roughMap.repeat.set(2,2);
+
+  // --- normal map: each scale drawn as a small radial "dome" in tangent-space normal colors ---
+  const c3 = document.createElement('canvas'); c3.width=c3.height=size;
+  const ctx3 = c3.getContext('2d');
+  ctx3.fillStyle = '#8080ff'; ctx3.fillRect(0,0,size,size); // flat-up normal
+  for(let row=0; row<size; row+=rowH){
+    const offset = (row/rowH)%2===0 ? 0 : scaleR;
+    for(let col=-scaleR; col<size+scaleR*2; col+=scaleR*2){
+      const g = ctx3.createRadialGradient(col+offset,row,0,col+offset,row,scaleR);
+      g.addColorStop(0,'#a9a9ff');
+      g.addColorStop(0.7,'#8888ff');
+      g.addColorStop(1,'#7070e8');
+      ctx3.fillStyle = g;
+      ctx3.beginPath();
+      ctx3.ellipse(col+offset,row,scaleR,scaleR*0.8,0,0,Math.PI*2);
+      ctx3.fill();
+    }
+  }
+  const normalMap = new THREE.CanvasTexture(c3);
+  normalMap.wrapS = normalMap.wrapT = THREE.RepeatWrapping;
+  normalMap.repeat.set(2,2);
+
+  const result = {colorMap, roughMap, normalMap};
+  _texCache[baseHex] = result;
+  return result;
+}
+
+function skinMaterial(baseHex, opts){
+  opts = opts || {};
+  const tex = makeSkinTextures(baseHex);
+  return new THREE.MeshPhysicalMaterial({
+    color: 0xffffff,
+    map: tex.colorMap,
+    roughnessMap: tex.roughMap,
+    normalMap: tex.normalMap,
+    normalScale: new THREE.Vector2(0.6,0.6),
+    roughness: 0.85,
+    metalness: 0.02,
+    clearcoat: 0.15,
+    clearcoatRoughness: 0.6,
+    ...opts
+  });
+}
+
+/* ---------------- Organic dinosaur builder (raptor-type, no boxes) ---------------- */
+function buildDino(bodyColor, riderShirt, headColor){
+  const g = new THREE.Group();
+  const skin = skinMaterial(bodyColor);
+  const headSkin = skinMaterial(headColor || bodyColor);
+  const bellyColor = new THREE.Color(bodyColor).offsetHSL(0, -0.15, 0.18).getHex();
+  const bellyMat = new THREE.MeshStandardMaterial({color:bellyColor, roughness:0.85});
+  const clawMat = new THREE.MeshStandardMaterial({color:0xe8dfc8, roughness:0.4});
+  const eyeMat = new THREE.MeshStandardMaterial({color:0xffcb3d, emissive:0xff9900, emissiveIntensity:0.5, roughness:0.3});
+
+  function ell(rx,ry,rz, mat){
+    const m = new THREE.Mesh(new THREE.SphereGeometry(1,22,16), mat);
+    m.scale.set(rx,ry,rz);
+    m.castShadow = true; m.receiveShadow = true;
+    return m;
+  }
+
+  /* ---- torso: three overlapping ellipsoids for a smooth, tapered silhouette ---- */
+  const torsoGroup = new THREE.Group();
+  const hip = ell(0.78,0.72,0.95, skin); hip.position.set(0,1.55,-0.75);
+  torsoGroup.add(hip);
+  const mid = ell(0.72,0.68,0.85, skin); mid.position.set(0,1.62,0.15);
+  torsoGroup.add(mid);
+  const chest = ell(0.62,0.6,0.68, skin); chest.position.set(0,1.68,0.95);
+  torsoGroup.add(chest);
+  const bellyPatch = ell(0.55,0.32,1.35, bellyMat); bellyPatch.position.set(0,1.1,0.05);
+  torsoGroup.add(bellyPatch);
+  g.add(torsoGroup);
+
+  /* ---- neck (3-sphere taper, curving up & forward) + head ---- */
+  const neckSegments = [];
+  const neckPts = [ [0,1.95,1.35,0.42], [0,2.25,1.75,0.36], [0,2.5,2.05,0.3] ];
+  neckPts.forEach(p=>{
+    const seg = ell(p[3],p[3]*0.95,p[3]*1.1, skin);
+    seg.position.set(p[0],p[1],p[2]);
+    torsoGroup.add(seg);
+    neckSegments.push(seg);
+  });
+
+  const headGroup = new THREE.Group();
+  const skull = ell(0.36,0.34,0.5, headSkin); skull.position.set(0,0,0);
+  headGroup.add(skull);
+  const snout = ell(0.22,0.2,0.42, headSkin); snout.position.set(0,-0.04,0.48);
+  headGroup.add(snout);
+  const jaw = ell(0.19,0.13,0.36, bellyMat); jaw.position.set(0,-0.22,0.46);
+  headGroup.add(jaw);
+  // small teeth
+  for(let i=0;i<4;i++){
+    const tooth = new THREE.Mesh(new THREE.ConeGeometry(0.025,0.09,4), clawMat);
+    tooth.position.set((i%2===0?-1:1)*(0.08+i*0.02), -0.13, 0.62-i*0.09);
+    tooth.rotation.x = Math.PI;
+    headGroup.add(tooth);
+  }
+  // brow ridges
+  [-1,1].forEach(s=>{
+    const brow = ell(0.09,0.05,0.16, headSkin);
+    brow.position.set(s*0.18, 0.16, 0.32);
+    headGroup.add(brow);
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.075,10,10), eyeMat);
+    eye.position.set(s*0.27, 0.06, 0.32);
+    headGroup.add(eye);
+  });
+  // tiny horn nubs (character detail)
+  [-1,1].forEach(s=>{
+    const horn = new THREE.Mesh(new THREE.ConeGeometry(0.06,0.18,6), clawMat);
+    horn.position.set(s*0.14,0.32,-0.1);
+    horn.rotation.x = -0.3;
+    headGroup.add(horn);
+  });
+  headGroup.position.set(0,2.62,2.28);
+  headGroup.rotation.x = -0.15;
+  torsoGroup.add(headGroup);
+
+  /* ---- tail: chain of tapering ellipsoids, each an independent pivot for wave motion ---- */
+  const tailSegments = [];
+  let tz = -1.55, ty = 1.5, count = 8;
+  let prevPivot = torsoGroup;
+  for(let i=0;i<count;i++){
+    const s = Math.max(0.12, 0.62 - i*0.065);
+    const pivot = new THREE.Group();
+    const seg = ell(s, s*0.9, 0.42, skin);
+    seg.position.z = 0.32;
+    pivot.add(seg);
+    if(i===0){ pivot.position.set(0, ty, tz); }
+    else { pivot.position.set(0,0,-0.6); }
+    prevPivot.add(pivot);
+    prevPivot = pivot;
+    tailSegments.push(pivot);
+  }
+
+  /* ---- legs: thigh + shin capsules with joint spheres + clawed toes ---- */
+  const legMat = skin;
+  const legDefs = [
+    {x:-0.62, z: 0.55, side:'front'}, {x:0.62, z: 0.55, side:'front'},
+    {x:-0.6,  z:-0.85, side:'back'},  {x:0.6,  z:-0.85, side:'back'}
+  ];
+  const legs = [];
+  legDefs.forEach(def=>{
+    const hipPivot = new THREE.Group();
+    hipPivot.position.set(def.x, 1.45, def.z);
+    torsoGroup.add(hipPivot);
+
+    const thigh = new THREE.Mesh(new THREE.CapsuleGeometry(0.24,0.55,4,10), legMat);
+    thigh.position.y = -0.32;
+    thigh.castShadow = true;
+    hipPivot.add(thigh);
+
+    const kneePivot = new THREE.Group();
+    kneePivot.position.y = -0.62;
+    hipPivot.add(kneePivot);
+
+    const shin = new THREE.Mesh(new THREE.CapsuleGeometry(0.17,0.5,4,10), legMat);
+    shin.position.y = -0.3;
+    shin.castShadow = true;
+    kneePivot.add(shin);
+
+    const footPivot = new THREE.Group();
+    footPivot.position.y = -0.58;
+    kneePivot.add(footPivot);
+
+    const foot = ell(0.16,0.11,0.26, legMat);
+    foot.position.set(0,-0.02,0.06);
+    footPivot.add(foot);
+    for(let t=-1;t<=1;t++){
+      const toe = new THREE.Mesh(new THREE.ConeGeometry(0.045,0.22,5), clawMat);
+      toe.rotation.x = Math.PI/2 + 0.3;
+      toe.position.set(t*0.09, -0.09, 0.24);
+      footPivot.add(toe);
+    }
+
+    legs.push({hip:hipPivot, knee:kneePivot, foot:footPivot, side:def.side});
+  });
+
+  /* ---- small forearms tucked near chest (raptor character detail) ---- */
+  [-1,1].forEach(s=>{
+    const armPivot = new THREE.Group();
+    armPivot.position.set(s*0.5, 1.55, 1.15);
+    torsoGroup.add(armPivot);
+    const upper = new THREE.Mesh(new THREE.CapsuleGeometry(0.09,0.28,4,8), legMat);
+    upper.rotation.z = s*0.6;
+    upper.position.set(s*0.1,-0.12,0.05);
+    armPivot.add(upper);
+    const claw = new THREE.Mesh(new THREE.ConeGeometry(0.05,0.14,5), clawMat);
+    claw.rotation.x = Math.PI/2+0.2;
+    claw.position.set(s*0.18,-0.32,0.22);
+    armPivot.add(claw);
+  });
+
+  /* ---- saddle + rider ---- */
+  const saddle = new THREE.Mesh(new THREE.CapsuleGeometry(0.42,0.55,4,10), new THREE.MeshStandardMaterial({color:0x5b3a24, roughness:0.8}));
+  saddle.rotation.z = Math.PI/2;
+  saddle.scale.set(1,0.55,1.05);
+  saddle.position.set(0,2.15,0.15);
+  torsoGroup.add(saddle);
+
+  // bridle strap around the snout + reins running back to the rider's hands
+  const strapMat = new THREE.MeshStandardMaterial({color:0x3a2a1c, roughness:0.75});
+  const bridle = new THREE.Mesh(new THREE.TorusGeometry(0.2,0.018,8,16), strapMat);
+  bridle.rotation.y = Math.PI/2;
+  bridle.position.set(0,-0.02,0.42);
+  headGroup.add(bridle);
+  [-1,1].forEach(s=>{
+    const rein = new THREE.Mesh(new THREE.CylinderGeometry(0.012,0.012,1.35,5), strapMat);
+    rein.position.set(s*0.16, 2.05, 1.55);
+    rein.rotation.x = 1.15;
+    rein.rotation.z = s*0.05;
+    torsoGroup.add(rein);
+  });
+
+  const rider = new THREE.Group();
+  const riderMat = new THREE.MeshStandardMaterial({color:riderShirt, roughness:0.7});
+  const skinTone = new THREE.MeshStandardMaterial({color:0xe0aa78, roughness:0.6});
+  const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.3,0.5,4,10), riderMat);
+  torso.position.y = 0.72; torso.castShadow = true;
+  rider.add(torso);
+  const riderHead = new THREE.Mesh(new THREE.SphereGeometry(0.26,14,14), skinTone);
+  riderHead.position.y = 1.25; riderHead.castShadow = true;
+  rider.add(riderHead);
+  const hair = ell(0.27,0.16,0.27, new THREE.MeshStandardMaterial({color:0x2a1e16, roughness:0.9}));
+  hair.position.set(0,1.35,-0.03);
+  rider.add(hair);
+  [-1,1].forEach(s=>{
+    const arm = new THREE.Mesh(new THREE.CapsuleGeometry(0.08,0.42,4,8), riderMat);
+    arm.position.set(s*0.34,0.85,0.28); arm.rotation.x = -1.0; arm.rotation.z = s*0.15;
+    rider.add(arm);
+    const leg = new THREE.Mesh(new THREE.CapsuleGeometry(0.1,0.4,4,8), new THREE.MeshStandardMaterial({color:0x2f3b52, roughness:0.8}));
+    leg.position.set(s*0.2,0.35,-0.05); leg.rotation.x = 1.2;
+    rider.add(leg);
+  });
+
+  // flowing cape — a few hinged panels so it can sway as the dino runs
+  const capeMat = new THREE.MeshStandardMaterial({color:0x2a5aa0, roughness:0.75, side:THREE.DoubleSide});
+  const capeGroup = new THREE.Group();
+  capeGroup.position.set(0,1.15,-0.28);
+  const capeSegs = [];
+  let prevCapeParent = capeGroup;
+  for(let i=0;i<3;i++){
+    const panel = new THREE.Mesh(new THREE.PlaneGeometry(0.5-i*0.05,0.34,1,1), capeMat);
+    panel.position.z = -0.17;
+    panel.position.y = -0.02;
+    const pivot = new THREE.Group();
+    pivot.position.z = i===0 ? 0 : -0.34;
+    pivot.add(panel);
+    prevCapeParent.add(pivot);
+    prevCapeParent = pivot;
+    capeSegs.push(pivot);
+  }
+  rider.add(capeGroup);
+
+  rider.position.set(0,2.3,0.15);
+  torsoGroup.add(rider);
+
+  g.userData.legs = legs;
+  g.userData.tailSegments = tailSegments;
+  g.userData.neckSegments = neckSegments;
+  g.userData.headGroup = headGroup;
+  g.userData.torsoGroup = torsoGroup;
+  g.userData.capeSegs = capeSegs;
+  // The rig was built with the head toward +z; the world scrolls toward +z
+  // (i.e. "forward" is -z), so flip the whole model to face the correct way.
+  g.rotation.y = Math.PI;
+  return g;
+}
+
+/* ---------------- Organic Triceratops-type builder (stockier, frilled, horned) ---------------- */
+function ellMesh(rx,ry,rz, mat){
+  const m = new THREE.Mesh(new THREE.SphereGeometry(1,22,16), mat);
+  m.scale.set(rx,ry,rz);
+  m.castShadow = true; m.receiveShadow = true;
+  return m;
+}
+
+function buildTriceratops(bodyColor, riderShirt, markColor){
+  const g = new THREE.Group();
+  const skin = skinMaterial(bodyColor);
+  const bellyColor = new THREE.Color(bodyColor).offsetHSL(0,-0.1,0.2).getHex();
+  const bellyMat = new THREE.MeshStandardMaterial({color:bellyColor, roughness:0.85});
+  const hornMat = new THREE.MeshStandardMaterial({color:0x2a2320, roughness:0.4});
+  const markMat = new THREE.MeshStandardMaterial({color: markColor||0x6fae6a, roughness:0.6});
+
+  const torsoGroup = new THREE.Group();
+  const hip = ellMesh(0.95,0.85,1.0, skin); hip.position.set(0,1.35,-0.7);
+  torsoGroup.add(hip);
+  const mid = ellMesh(0.98,0.88,0.95, skin); mid.position.set(0,1.4,0.35);
+  torsoGroup.add(mid);
+  const bellyPatch = ellMesh(0.7,0.4,1.5, bellyMat); bellyPatch.position.set(0,0.85,0.1);
+  torsoGroup.add(bellyPatch);
+  g.add(torsoGroup);
+
+  // short thick neck straight into a wide frilled head
+  const neckSegments = [];
+  const neck = ellMesh(0.55,0.5,0.5, skin); neck.position.set(0,1.7,1.15);
+  torsoGroup.add(neck); neckSegments.push(neck);
+
+  const headGroup = new THREE.Group();
+  const frill = new THREE.Mesh(new THREE.CylinderGeometry(0.72,0.55,0.16,16,1,false,0,Math.PI), skin);
+  frill.rotation.x = Math.PI/2;
+  frill.rotation.z = Math.PI;
+  frill.position.set(0,0.28,-0.28);
+  headGroup.add(frill);
+  [-1,1].forEach(s=>{
+    const spike = new THREE.Mesh(new THREE.ConeGeometry(0.08,0.3,6), hornMat);
+    spike.position.set(s*0.55,0.55,-0.32); spike.rotation.x = -0.4;
+    headGroup.add(spike);
+  });
+  const skull = ellMesh(0.4,0.36,0.4, skin); skull.position.set(0,0.05,0.15);
+  headGroup.add(skull);
+  const beak = ellMesh(0.2,0.16,0.22, bellyMat); beak.position.set(0,-0.08,0.5);
+  headGroup.add(beak);
+  const noseHorn = new THREE.Mesh(new THREE.ConeGeometry(0.07,0.32,7), hornMat);
+  noseHorn.position.set(0,0.12,0.48); noseHorn.rotation.x = -0.25;
+  headGroup.add(noseHorn);
+  [-1,1].forEach(s=>{
+    const browHorn = new THREE.Mesh(new THREE.ConeGeometry(0.075,0.62,7), hornMat);
+    browHorn.position.set(s*0.22,0.42,0.22); browHorn.rotation.x = -0.55; browHorn.rotation.z = s*0.12;
+    headGroup.add(browHorn);
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.075,10,10), new THREE.MeshStandardMaterial({color:0x3a2a18}));
+    eye.position.set(s*0.32,0.14,0.28);
+    headGroup.add(eye);
+    const stripe = ellMesh(0.05,0.22,0.05, markMat);
+    stripe.position.set(s*0.35,0.05,0.18);
+    headGroup.add(stripe);
+  });
+  headGroup.position.set(0,1.85,1.55);
+  torsoGroup.add(headGroup);
+
+  // stub tail
+  const tailSegments = [];
+  let prevPivot = torsoGroup;
+  for(let i=0;i<4;i++){
+    const s = Math.max(0.14, 0.42 - i*0.07);
+    const pivot = new THREE.Group();
+    const seg = ellMesh(s,s*0.9,0.3, skin);
+    seg.position.z = 0.22;
+    pivot.add(seg);
+    pivot.position.set(0,0, i===0 ? -1.55 : -0.42);
+    prevPivot.add(pivot);
+    prevPivot = pivot;
+    tailSegments.push(pivot);
+  }
+
+  // thick, stocky legs
+  const legDefs = [
+    {x:-0.72, z: 0.55}, {x:0.72, z: 0.55},
+    {x:-0.75, z:-0.75}, {x:0.75, z:-0.75}
+  ];
+  const legs = [];
+  legDefs.forEach(def=>{
+    const hipPivot = new THREE.Group();
+    hipPivot.position.set(def.x, 1.05, def.z);
+    torsoGroup.add(hipPivot);
+    const thigh = new THREE.Mesh(new THREE.CapsuleGeometry(0.3,0.42,4,10), skin);
+    thigh.position.y = -0.28; thigh.castShadow = true;
+    hipPivot.add(thigh);
+    const kneePivot = new THREE.Group();
+    kneePivot.position.y = -0.5;
+    hipPivot.add(kneePivot);
+    const shin = new THREE.Mesh(new THREE.CapsuleGeometry(0.22,0.35,4,10), skin);
+    shin.position.y = -0.24; shin.castShadow = true;
+    kneePivot.add(shin);
+    const footPivot = new THREE.Group();
+    footPivot.position.y = -0.42;
+    kneePivot.add(footPivot);
+    const foot = ellMesh(0.22,0.14,0.28, skin);
+    footPivot.add(foot);
+    legs.push({hip:hipPivot, knee:kneePivot, foot:footPivot});
+  });
+
+  const saddle = new THREE.Mesh(new THREE.CapsuleGeometry(0.44,0.5,4,10), new THREE.MeshStandardMaterial({color:0x5b3a24, roughness:0.8}));
+  saddle.rotation.z = Math.PI/2; saddle.scale.set(1,0.55,1.05);
+  saddle.position.set(0,2.0,0.55);
+  torsoGroup.add(saddle);
+
+  const rider = new THREE.Group();
+  const riderMat = new THREE.MeshStandardMaterial({color:riderShirt, roughness:0.7});
+  const skinTone = new THREE.MeshStandardMaterial({color:0xc98f66, roughness:0.6});
+  const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.28,0.46,4,10), riderMat);
+  torso.position.y = 0.68; torso.castShadow = true;
+  rider.add(torso);
+  const riderHead = new THREE.Mesh(new THREE.SphereGeometry(0.24,14,14), skinTone);
+  riderHead.position.y = 1.18; riderHead.castShadow = true;
+  rider.add(riderHead);
+  const hair = ellMesh(0.24,0.22,0.24, new THREE.MeshStandardMaterial({color:0x1c140f, roughness:0.9}));
+  hair.position.set(0,1.28,-0.02);
+  rider.add(hair);
+  [-1,1].forEach(s=>{
+    const arm = new THREE.Mesh(new THREE.CapsuleGeometry(0.075,0.38,4,8), riderMat);
+    arm.position.set(s*0.32,0.8,0.2); arm.rotation.x = -0.7; arm.rotation.z = s*0.15;
+    rider.add(arm);
+    const leg = new THREE.Mesh(new THREE.CapsuleGeometry(0.09,0.36,4,8), new THREE.MeshStandardMaterial({color:0x3a2c22, roughness:0.8}));
+    leg.position.set(s*0.2,0.3,-0.05); leg.rotation.x = 1.2;
+    rider.add(leg);
+  });
+  rider.position.set(0,2.15,0.55);
+  torsoGroup.add(rider);
+
+  g.userData.legs = legs;
+  g.userData.tailSegments = tailSegments;
+  g.userData.neckSegments = neckSegments;
+  g.userData.headGroup = headGroup;
+  g.userData.torsoGroup = torsoGroup;
+  g.userData.capeSegs = null;
+  g.rotation.y = Math.PI;
+  return g;
+}
+
+/* ---------------- Ground & environment (chunked, recycled) ---------------- */
+let groundChunks = [];
+let sideProps = [];
+const CHUNK_LEN = 20;
+const CHUNKS_AHEAD = 8;
+
+function makeGroundMat(stage){
+  return new THREE.MeshStandardMaterial({color:stage.ground, roughness:0.95});
+}
+
+/* ---- procedural dusty street texture (reuses the noise-canvas approach from skin) ---- */
+const _groundTexCache = {};
+function makeGroundTexture(stage){
+  if(_groundTexCache[stage.id]) return _groundTexCache[stage.id];
+  const rgb = hexToRgb(stage.ground);
+  const size = 256;
+  const c = document.createElement('canvas'); c.width=c.height=size;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = shade(rgb,0); ctx.fillRect(0,0,size,size);
+  for(let i=0;i<220;i++){
+    const r = 2+Math.random()*7;
+    ctx.fillStyle = shade(rgb, Math.random()<0.5 ? -(8+Math.random()*20) : (6+Math.random()*16));
+    ctx.globalAlpha = 0.5;
+    ctx.beginPath(); ctx.arc(Math.random()*size, Math.random()*size, r, 0, Math.PI*2); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  // worn cart-track streaks down the lanes
+  ctx.strokeStyle = shade(rgb,-24);
+  ctx.lineWidth = 5; ctx.globalAlpha = 0.3;
+  [size*0.28, size*0.72].forEach(x=>{
+    ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,size); ctx.stroke();
+  });
+  ctx.globalAlpha = 1;
+  // stone paving joints
+  ctx.strokeStyle = shade(rgb,-30); ctx.lineWidth = 1.5; ctx.globalAlpha = 0.35;
+  for(let y=0;y<size;y+=22){
+    ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(size,y); ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(2, CHUNK_LEN/6);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  _groundTexCache[stage.id] = tex;
+  return tex;
+}
+
+/* ---- procedural stone-block building facade texture ---- */
+const _wallTexCache = {};
+function makeWallTexture(stage){
+  if(_wallTexCache[stage.id]) return _wallTexCache[stage.id];
+  const rgb = hexToRgb(stage.buildingColor);
+  const size = 256;
+  const c = document.createElement('canvas'); c.width=c.height=size;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = shade(rgb,0); ctx.fillRect(0,0,size,size);
+  const rows = 8, cols = 6;
+  for(let r=0;r<rows;r++){
+    const offset = (r%2===0) ? 0 : (size/cols)/2;
+    for(let col=-1;col<=cols;col++){
+      const x = col*(size/cols) + offset;
+      const y = r*(size/rows);
+      ctx.fillStyle = shade(rgb, (Math.random()<0.5?-1:1)*(6+Math.random()*10));
+      ctx.fillRect(x+2, y+2, size/cols-4, size/rows-4);
+      ctx.strokeStyle = shade(rgb,-34);
+      ctx.lineWidth = 2;
+      ctx.strokeRect(x+2, y+2, size/cols-4, size/rows-4);
+    }
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  _wallTexCache[stage.id] = tex;
+  return tex;
+}
+
+/* ---- procedural striped banner/awning texture ---- */
+const _bannerTexCache = {};
+function makeBannerTexture(colorA, colorB){
+  const key = colorA+'_'+colorB;
+  if(_bannerTexCache[key]) return _bannerTexCache[key];
+  const size = 128;
+  const c = document.createElement('canvas'); c.width=size; c.height=size;
+  const ctx = c.getContext('2d');
+  const stripes = 6;
+  for(let i=0;i<stripes;i++){
+    ctx.fillStyle = i%2===0 ? '#'+colorA.toString(16).padStart(6,'0') : '#'+colorB.toString(16).padStart(6,'0');
+    ctx.fillRect(0, i*(size/stripes), size, size/stripes);
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  _bannerTexCache[key] = tex;
+  return tex;
+}
+
+/* ---- cheering crowd silhouette sprite (billboard, always faces camera) ---- */
+let _crowdTex = null;
+function getCrowdTexture(){
+  if(_crowdTex) return _crowdTex;
+  const c = document.createElement('canvas'); c.width=128; c.height=96;
+  const ctx = c.getContext('2d');
+  for(let i=0;i<5;i++){
+    const x = 10 + i*24, y = 60;
+    ctx.fillStyle = ['#3a2a1f','#2f2418','#4a3524','#2a2015','#3f2e1c'][i];
+    ctx.beginPath(); ctx.arc(x,y-34,9,0,Math.PI*2); ctx.fill(); // head
+    ctx.fillRect(x-8,y-26,16,30); // torso
+    // raised arms
+    ctx.save();
+    ctx.translate(x-8,y-22); ctx.rotate(-0.9); ctx.fillRect(0,-3,18,6); ctx.restore();
+    ctx.save();
+    ctx.translate(x+8,y-22); ctx.rotate(0.9); ctx.fillRect(-18,-3,18,6); ctx.restore();
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  _crowdTex = tex;
+  return tex;
+}
+
+const _skyTexLoader = new THREE.TextureLoader();
+const _pmremGen = new THREE.PMREMGenerator(renderer);
+_pmremGen.compileEquirectangularShader();
+const _skyEnvCache = {};
+
+function buildEnvironment(stage){
+  clearGroup(worldGroup);
+  groundChunks = [];
+  sideProps = [];
+
+  scene.fog = new THREE.Fog(stage.fog, 20, 95);
+  scene.background = new THREE.Color(stage.bg);
+  scene.environment = null;
+
+  if(stage.skyImage){
+    if(_skyEnvCache[stage.skyImage]){
+      scene.background = _skyEnvCache[stage.skyImage].bgTexture;
+      scene.environment = _skyEnvCache[stage.skyImage].envTexture;
+    } else {
+      _skyTexLoader.load(stage.skyImage, (tex)=>{
+        tex.mapping = THREE.EquirectangularReflectionMapping;
+        tex.colorSpace = THREE.SRGBColorSpace;
+        const envRT = _pmremGen.fromEquirectangular(tex);
+        _skyEnvCache[stage.skyImage] = {bgTexture: tex, envTexture: envRT.texture};
+        // only apply if the player is still on this stage when the photo finishes loading
+        if(gameState==='playing' && STAGES[currentStageIdx]===stage){
+          scene.background = tex;
+          scene.environment = envRT.texture;
+        }
+      }, undefined, ()=>{
+        // real photo missing (e.g. running the .html standalone without its companion
+        // image file) — silently keep the flat procedural color/fog sky instead
+      });
+    }
+  }
+
+  const groundTex = makeGroundTexture(stage);
+  const gMat = new THREE.MeshStandardMaterial({map: groundTex, color:0xffffff, roughness:0.97});
+  const laneStripeMat = new THREE.MeshStandardMaterial({color: stage.ground2, roughness:0.9});
+
+  for(let i=0;i<CHUNKS_AHEAD;i++){
+    addGroundChunk(-i*CHUNK_LEN, stage, gMat, laneStripeMat);
+  }
+}
+
+function addGroundChunk(zPos, stage, gMat, stripeMat){
+  const g = new THREE.Group();
+  const plane = new THREE.Mesh(new THREE.PlaneGeometry(12, CHUNK_LEN+0.1), gMat);
+  plane.rotation.x = -Math.PI/2;
+  plane.receiveShadow = true;
+  g.add(plane);
+
+  LANE_X.forEach(lx=>{
+    const stripe = new THREE.Mesh(new THREE.PlaneGeometry(0.1, CHUNK_LEN), stripeMat);
+    stripe.rotation.x = -Math.PI/2;
+    stripe.position.set(lx, 0.015, 0);
+    stripe.material.transparent = true;
+    stripe.material.opacity = 0.25;
+    g.add(stripe);
+  });
+
+  // ancient street: a building (+ banner) on each side, an occasional arch spanning the road
+  [-1,1].forEach(side=>{
+    const building = buildCityBuilding(stage);
+    building.position.set(side*7.6, 0, (Math.random()-0.5)*4);
+    g.add(building);
+  });
+  if(Math.random() < 0.35){
+    const arch = buildStoneArch(stage);
+    arch.position.set(0,0,(Math.random()-0.5)*CHUNK_LEN*0.6);
+    g.add(arch);
+  }
+
+  g.position.z = zPos;
+  worldGroup.add(g);
+  groundChunks.push(g);
+}
+
+function buildCityBuilding(stage){
+  const group = new THREE.Group();
+  const h = 4.5 + Math.random()*3.5;
+  const w = 3.4 + Math.random()*1.4;
+  const d = 3 + Math.random()*1.5;
+  const wallTex = makeWallTexture(stage);
+  const wallMat = new THREE.MeshStandardMaterial({map:wallTex, color:0xffffff, roughness:0.92});
+  const body = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), wallMat);
+  body.position.y = h/2;
+  body.castShadow = true; body.receiveShadow = true;
+  group.add(body);
+
+  // flat roof trim
+  const trim = new THREE.Mesh(new THREE.BoxGeometry(w+0.3,0.25,d+0.3), new THREE.MeshStandardMaterial({color:stage.bandColor, roughness:0.9}));
+  trim.position.y = h+0.12;
+  group.add(trim);
+
+  // arched doorway cut-out illusion (dark recessed panel)
+  const arch = new THREE.Mesh(new THREE.CylinderGeometry(0.65,0.65,0.35,16,1,false,0,Math.PI), new THREE.MeshStandardMaterial({color:0x120c08, roughness:1}));
+  arch.rotation.z = Math.PI/2;
+  arch.position.set(0, 1.3, d/2+0.02);
+  group.add(arch);
+  const doorway = new THREE.Mesh(new THREE.BoxGeometry(1.3,1.3,0.3), new THREE.MeshStandardMaterial({color:0x120c08, roughness:1}));
+  doorway.position.set(0,0.65,d/2+0.02);
+  group.add(doorway);
+
+  // striped awning banner jutting toward the street
+  const bannerTex = makeBannerTexture(stage.bannerA, stage.bannerB);
+  const bannerMat = new THREE.MeshStandardMaterial({map:bannerTex, roughness:0.8, side:THREE.DoubleSide});
+  const banner = new THREE.Mesh(new THREE.PlaneGeometry(w*0.9, 1.6), bannerMat);
+  banner.position.set(0, h*0.62, d/2+0.9);
+  banner.rotation.x = -0.35;
+  group.add(banner);
+  group.userData.banner = banner;
+
+  return group;
+}
+
+function buildStoneArch(stage){
+  const group = new THREE.Group();
+  const stoneMat = new THREE.MeshStandardMaterial({color:stage.wallColor, roughness:0.95});
+  [-1,1].forEach(s=>{
+    const pillar = new THREE.Mesh(new THREE.BoxGeometry(1.1,6.5,1.1), stoneMat);
+    pillar.position.set(s*5.4, 3.25, 0);
+    pillar.castShadow = true;
+    group.add(pillar);
+  });
+  const archTop = new THREE.Mesh(new THREE.TorusGeometry(4.85,0.75,10,20,Math.PI), stoneMat);
+  archTop.position.set(0,6.5,0);
+  archTop.castShadow = true;
+  group.add(archTop);
+  // small triumphal banner across the top
+  const bannerTex = makeBannerTexture(stage.bannerA, stage.bannerB);
+  const flag = new THREE.Mesh(new THREE.PlaneGeometry(3.2,1.0), new THREE.MeshStandardMaterial({map:bannerTex, side:THREE.DoubleSide}));
+  flag.position.set(0,7.4,0);
+  group.add(flag);
+  // cheering crowd sprites on top
+  for(let i=0;i<3;i++){
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({map:getCrowdTexture(), transparent:true}));
+    sprite.scale.set(3,2.2,1);
+    sprite.position.set((i-1)*3.2, 8.6, 0);
+    group.add(sprite);
+  }
+  return group;
+}
+
+function clearGroup(g){
+  while(g.children.length){
+    g.remove(g.children[0]);
+  }
+}
+
+const worldGroup = new THREE.Group();
+scene.add(worldGroup);
+
+/* ---------------- Player ---------------- */
+const player = {
+  laneIdx: 1,
+  x: 0,
+  y: 0,
+  vY: 0,
+  jumping: false,
+  distance: 0,
+  speed: 11,
+  baseSpeed: 11,
+  maxSpeed: 26,
+  lives: 3,
+  invincibleT: 0,
+  boost: 0,
+  boosting: false,
+  boostT: 0,
+  runPhase: 0,
+  dead: false
+};
+let playerModel = null;
+
+function resetPlayer(stage){
+  player.laneIdx = 1;
+  player.x = LANE_X[1];
+  player.y = 0; player.vY = 0; player.jumping=false;
+  player.distance = 0;
+  player.baseSpeed = 11;
+  player.speed = player.baseSpeed;
+  player.lives = 3;
+  player.invincibleT = 0;
+  player.boost = 0; player.boosting=false; player.boostT=0;
+  player.dead = false;
+  if(playerModel) scene.remove(playerModel);
+  playerModel = buildDino(0x2e333d, 0xa0703e, 0xc9a86a);
+  playerModel.position.set(LANE_X[1],0,0);
+  scene.add(playerModel);
+}
+
+/* ---------------- Rivals ---------------- */
+let rivals = [];
+function resetRivals(stage){
+  rivals.forEach(r=>scene.remove(r.model));
+  rivals = [];
+  const colors = [0xa07850, 0xc79a2e, 0x6b4fa0];
+  const shirts = [0x8a3f2f, 0xe0a52e, 0x8a4fd9];
+  for(let i=0;i<3;i++){
+    const model = (i===0)
+      ? buildTriceratops(colors[i], shirts[i], 0x6fae6a)
+      : buildDino(colors[i], shirts[i]);
+    const laneIdx = i % LANE_COUNT;
+    model.position.set(LANE_X[laneIdx], 0, -6 - i*4);
+    scene.add(model);
+    rivals.push({
+      model, laneIdx,
+      distance: 0,
+      speed: player.baseSpeed * (0.86 + Math.random()*0.22),
+      zOffset: -6 - i*4,
+      runPhase: Math.random()*10
+    });
+  }
+}
+
+/* ---------------- Obstacles & orbs ---------------- */
+let obstacles = [];
+let orbs = [];
+const OBSTACLE_MESH_POOL = [];
+
+function spawnField(stage){
+  obstacles.forEach(o=>scene.remove(o.mesh));
+  orbs.forEach(o=>scene.remove(o.mesh));
+  obstacles = [];
+  orbs = [];
+  let z = -14;
+  while(z > -stage.goal - 20){
+    if(Math.random() < 0.55){
+      const lane = Math.floor(Math.random()*LANE_COUNT);
+      spawnObstacle(stage, lane, z);
+    }
+    if(Math.random() < 0.5){
+      const lane = Math.floor(Math.random()*LANE_COUNT);
+      spawnOrb(lane, z - 2);
+    }
+    z -= 8 + Math.random()*7;
+  }
+  // finish line marker
+  spawnFinish(stage, -stage.goal);
+}
+
+function spawnObstacle(stage, lane, z){
+  const type = Math.random() < 0.5 ? 'rock' : 'log';
+  let mesh;
+  if(type==='rock'){
+    mesh = new THREE.Mesh(new THREE.DodecahedronGeometry(0.55), new THREE.MeshStandardMaterial({color:stage.obstacle, roughness:0.9}));
+    mesh.position.y = 0.5;
+  } else {
+    mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.35,0.35,2.6,8), new THREE.MeshStandardMaterial({color:stage.obstacle, roughness:0.85}));
+    mesh.rotation.z = Math.PI/2;
+    mesh.position.y = 0.35;
+  }
+  mesh.castShadow = true;
+  mesh.position.x = LANE_X[lane];
+  mesh.position.z = z;
+  scene.add(mesh);
+  obstacles.push({mesh, lane, z, passed:false, hit:false});
+}
+
+function spawnOrb(lane, z){
+  const mesh = new THREE.Mesh(new THREE.OctahedronGeometry(0.32), new THREE.MeshStandardMaterial({color:0xffb703, emissive:0xff9500, emissiveIntensity:0.6, roughness:0.4}));
+  mesh.position.set(LANE_X[lane], 1.1, z);
+  scene.add(mesh);
+  orbs.push({mesh, lane, z, collected:false});
+}
+
+let finishMarker = null;
+function spawnFinish(stage, z){
+  const g = new THREE.Group();
+  const barH = 4.5;
+  [-1,1].forEach(s=>{
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.18,0.18,barH,8), new THREE.MeshStandardMaterial({color:0xffffff}));
+    pole.position.set(s*4.6, barH/2, 0);
+    g.add(pole);
+  });
+  const banner = new THREE.Mesh(new THREE.BoxGeometry(9.4,0.9,0.15), new THREE.MeshStandardMaterial({color:stage.accent, emissive:stage.accent, emissiveIntensity:0.3}));
+  banner.position.set(0, barH-0.3, 0);
+  g.add(banner);
+  g.position.z = z;
+  scene.add(g);
+  finishMarker = g;
+}
+
+/* ---------------- Input ---------------- */
+let touchStartX=0, touchStartY=0, touchActive=false;
+function changeLane(dir){
+  const newLane = Math.max(0, Math.min(LANE_COUNT-1, player.laneIdx + dir));
+  if(newLane !== player.laneIdx) SFX.laneSwitch();
+  player.laneIdx = newLane;
+}
+function doJump(){
+  if(!player.jumping){
+    player.jumping = true;
+    player.vY = 9.2;
+    SFX.jump();
+  }
+}
+function doBoost(){
+  if(player.boost > 15 && !player.boosting){
+    player.boosting = true;
+    SFX.boost();
+  }
+}
+
+window.addEventListener('keydown', e=>{
+  if(e.key==='ArrowLeft'||e.key==='a') changeLane(-1);
+  if(e.key==='ArrowRight'||e.key==='d') changeLane(1);
+  if(e.key==='ArrowUp'||e.key===' '||e.key==='w') doJump();
+  if(e.key==='Shift') doBoost();
+});
+
+canvas.addEventListener('touchstart', e=>{
+  touchStartX = e.touches[0].clientX;
+  touchStartY = e.touches[0].clientY;
+  touchActive = true;
+}, {passive:true});
+canvas.addEventListener('touchend', e=>{
+  if(!touchActive) return;
+  touchActive = false;
+  const dx = (e.changedTouches[0].clientX - touchStartX);
+  const dy = (e.changedTouches[0].clientY - touchStartY);
+  if(Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 35){
+    changeLane(dx>0?1:-1);
+  } else if(dy < -35){
+    doJump();
+  } else if(Math.abs(dx) < 20 && Math.abs(dy) < 20){
+    doJump();
+  }
+}, {passive:true});
+
+document.getElementById('btnLeft').addEventListener('touchstart', e=>{e.preventDefault();changeLane(-1);});
+document.getElementById('btnRight').addEventListener('touchstart', e=>{e.preventDefault();changeLane(1);});
+document.getElementById('btnJump').addEventListener('touchstart', e=>{e.preventDefault();doJump();});
+document.getElementById('btnBoost').addEventListener('touchstart', e=>{e.preventDefault();doBoost();});
+document.getElementById('btnLeft').addEventListener('click', ()=>changeLane(-1));
+document.getElementById('btnRight').addEventListener('click', ()=>changeLane(1));
+document.getElementById('btnJump').addEventListener('click', doJump);
+document.getElementById('btnBoost').addEventListener('click', doBoost);
+
+if('ontouchstart' in window){
+  document.getElementById('touchControls').style.display = 'block';
+}
+
+/* ---------------- Game flow / UI wiring ---------------- */
+let currentStageIdx = 0;
+let gameState = 'menu'; // menu, intro, playing, result
+
+const menuOverlay = document.getElementById('menuOverlay');
+const introOverlay = document.getElementById('introOverlay');
+const resultOverlay = document.getElementById('resultOverlay');
+const hud = document.getElementById('hud');
+const boostWrap = document.getElementById('boostWrap');
+
+function renderStageList(){
+  const list = document.getElementById('stageList');
+  list.innerHTML = '';
+  STAGES.forEach((s, i)=>{
+    const unlocked = i < save.unlocked;
+    const card = document.createElement('div');
+    card.className = 'stageCard' + (unlocked?'':' locked');
+    const best = save.best[i];
+    card.innerHTML = `
+      <div class="stageInfo">
+        <b>${i+1}. ${s.name}</b>
+        <span>${s.desc}${best?(' · best '+best+'m/s avg'):''}</span>
+      </div>
+      ${unlocked ? '<button class="goBtn">RACE</button>' : '<div class="lockIcon">🔒</div>'}
+    `;
+    if(unlocked){
+      card.querySelector('.goBtn').addEventListener('click', ()=>openIntro(i));
+    }
+    list.appendChild(card);
+  });
+}
+
+function openIntro(idx){
+  SFX.click();
+  currentStageIdx = idx;
+  const s = STAGES[idx];
+  document.getElementById('introTitle').textContent = 'STAGE ' + (idx+1);
+  document.getElementById('introSubtitle').textContent = s.name.toUpperCase() + ' — ' + s.desc;
+  menuOverlay.classList.add('hidden');
+  introOverlay.classList.remove('hidden');
+  gameState = 'intro';
+}
+
+document.getElementById('startRaceBtn').addEventListener('click', ()=>{
+  SFX.click();
+  introOverlay.classList.add('hidden');
+  startStage(currentStageIdx);
+});
+
+function startStage(idx){
+  const stage = STAGES[idx];
+  buildEnvironment(stage);
+  resetPlayer(stage);
+  resetRivals(stage);
+  spawnField(stage);
+  hud.classList.remove('hidden');
+  boostWrap.classList.remove('hidden');
+  gameState = 'playing';
+  clock.getDelta();
+}
+
+function endStage(success){
+  gameState = 'result';
+  if(success) SFX.stageComplete();
+  hud.classList.add('hidden');
+  boostWrap.classList.add('hidden');
+  const stage = STAGES[currentStageIdx];
+  const title = document.getElementById('resultTitle');
+  const stats = document.getElementById('resultStats');
+  const nextBtn = document.getElementById('nextBtn');
+
+  if(success){
+    title.textContent = '🏁 STAGE COMPLETE';
+    title.style.color = '#ffd166';
+    const rank = computeRank();
+    const avg = Math.round(stage.goal / Math.max(1, raceClock));
+    if(!save.best[currentStageIdx] || avg > save.best[currentStageIdx]) save.best[currentStageIdx] = avg;
+    if(currentStageIdx+1 >= save.unlocked && currentStageIdx+1 < STAGES.length) save.unlocked = currentStageIdx+2;
+    if(save.unlocked > STAGES.length) save.unlocked = STAGES.length;
+    writeSave(save);
+    stats.innerHTML = `${stage.name}<br>Finished ${rank} place<br>Avg speed ${avg} m/s`;
+    nextBtn.style.display = (currentStageIdx+1 < STAGES.length) ? 'inline-block':'none';
+    nextBtn.textContent = (currentStageIdx+1 < STAGES.length) ? 'NEXT STAGE' : 'CONTINUE';
+  } else {
+    title.textContent = '💀 RUN OVER';
+    title.style.color = '#ef476f';
+    stats.innerHTML = `${stage.name}<br>Distance reached: ${Math.floor(player.distance)}m of ${stage.goal}m`;
+    nextBtn.style.display = 'none';
+  }
+}
+
+function computeRank(){
+  const all = [{who:'you', d:player.distance}, ...rivals.map(r=>({who:'r',d:r.distance}))];
+  all.sort((a,b)=>b.d-a.d);
+  const pos = all.findIndex(a=>a.who==='you') + 1;
+  return ['1st','2nd','3rd','4th'][pos-1] || (pos+'th');
+}
+
+document.getElementById('nextBtn').addEventListener('click', ()=>{
+  resultOverlay.classList.add('hidden');
+  if(currentStageIdx+1 < STAGES.length && currentStageIdx+1 < save.unlocked+1){
+    openIntroDirect(currentStageIdx+1);
+  } else {
+    renderStageList();
+    menuOverlay.classList.remove('hidden');
+    gameState = 'menu';
+  }
+});
+function openIntroDirect(idx){
+  menuOverlay.classList.add('hidden');
+  currentStageIdx = idx;
+  const s = STAGES[idx];
+  document.getElementById('introTitle').textContent = 'STAGE ' + (idx+1);
+  document.getElementById('introSubtitle').textContent = s.name.toUpperCase() + ' — ' + s.desc;
+  introOverlay.classList.remove('hidden');
+  gameState = 'intro';
+}
+document.getElementById('retryBtn').addEventListener('click', ()=>{
+  SFX.click();
+  resultOverlay.classList.add('hidden');
+  startStage(currentStageIdx);
+});
+document.getElementById('menuBtn').addEventListener('click', ()=>{
+  SFX.click();
+  resultOverlay.classList.add('hidden');
+  renderStageList();
+  menuOverlay.classList.remove('hidden');
+  gameState = 'menu';
+});
+
+renderStageList();
+
+/* ---------------- Camera rig ---------------- */
+camera.position.set(0, 4.6, 8.5);
+let camRoll = 0;
+let prevLaneX = LANE_X[1];
+
+/* ---------------- Animation helpers ---------------- */
+function animateRun(model, phase, speedFactor){
+  const legs = model.userData.legs;
+  const strideF = 9 * speedFactor;
+  legs.forEach((leg,i)=>{
+    // diagonal gait: front-left+back-right in phase, front-right+back-left offset
+    const diag = (i===0 || i===3) ? 0 : Math.PI;
+    const t = phase*strideF + diag;
+    const hipSwing = Math.sin(t) * 0.62;
+    leg.hip.rotation.x = hipSwing;
+    // knee bends more during the "lift/forward" half of the stride
+    const kneeBend = Math.max(0, Math.sin(t + 0.9)) * 0.9;
+    leg.knee.rotation.x = -kneeBend;
+    leg.foot.rotation.x = kneeBend*0.6 - hipSwing*0.25;
+  });
+
+  // tail whip: wave travels down the tail with per-segment phase delay
+  const tail = model.userData.tailSegments;
+  tail.forEach((seg,i)=>{
+    seg.rotation.y = Math.sin(phase*strideF*0.5 - i*0.55) * (0.14 + i*0.015);
+    seg.rotation.x = Math.sin(phase*strideF*0.5 - i*0.55 + 1.2) * 0.03;
+  });
+
+  // neck sway + head bob for a lifelike stride
+  const neck = model.userData.neckSegments;
+  neck.forEach((seg,i)=>{
+    seg.rotation.x = Math.sin(phase*strideF + i*0.3) * 0.03;
+  });
+  if(model.userData.headGroup){
+    model.userData.headGroup.rotation.x = -0.15 + Math.sin(phase*strideF*2)*0.045;
+  }
+
+  // overall body bounce + slight roll, driven by the diagonal stride
+  const bounce = Math.abs(Math.sin(phase*strideF)) * 0.1;
+  model.userData.torsoGroup.position.y = bounce;
+  model.rotation.z = Math.sin(phase*strideF)*0.025;
+
+  // cape flutter — trails and billows with speed
+  if(model.userData.capeSegs){
+    model.userData.capeSegs.forEach((seg,i)=>{
+      seg.rotation.x = -0.15 - i*0.12 + Math.sin(phase*strideF*0.5 + i*0.8)*0.08;
+      seg.rotation.y = Math.sin(phase*strideF*0.4 + i)*0.15;
+    });
+  }
+}
+
+/* ---------------- Main loop ---------------- */
+const clock = new THREE.Clock();
+let raceClock = 0;
+
+function updatePlaying(dt){
+  raceClock += dt;
+  const stage = STAGES[currentStageIdx];
+
+  // speed ramp + boost
+  player.baseSpeed = Math.min(player.maxSpeed, 11 + player.distance*0.006);
+  if(player.boosting){
+    player.speed = player.baseSpeed * 1.8;
+    player.boost -= dt*38;
+    player.boostT += dt;
+    if(player.boost <= 0){ player.boost = 0; player.boosting=false; }
+  } else {
+    player.speed = player.baseSpeed;
+  }
+  player.distance += player.speed * dt;
+  player.runPhase += dt;
+
+  // lane easing
+  const targetX = LANE_X[player.laneIdx];
+  player.x += (targetX - player.x) * Math.min(1, dt*10);
+
+  // jump physics
+  if(player.jumping){
+    player.vY -= 26*dt;
+    player.y += player.vY*dt;
+    if(player.y <= 0){ player.y = 0; if(player.jumping) SFX.land(); player.jumping=false; player.vY=0; }
+  }
+
+  playerModel.position.x = player.x;
+  playerModel.position.y = player.y;
+  if(!player.jumping) animateRun(playerModel, player.runPhase, player.speed/11);
+  else playerModel.rotation.x = -0.15;
+  if(!player.jumping) playerModel.rotation.x = 0;
+
+  if(player.invincibleT > 0){
+    player.invincibleT -= dt;
+    playerModel.visible = Math.floor(player.invincibleT*12)%2===0;
+  } else {
+    playerModel.visible = true;
+  }
+
+  // move world (ground, obstacles, orbs, finish, rivals) toward camera relative to player's forward speed
+  const dz = player.speed * dt;
+  worldGroup.children.forEach(chunk=>{
+    chunk.position.z += dz;
+  });
+  // recycle chunks
+  groundChunks.forEach(chunk=>{
+    if(chunk.position.z > CHUNK_LEN*1.5){
+      chunk.position.z -= CHUNK_LEN*CHUNKS_AHEAD;
+    }
+  });
+
+  obstacles.forEach(o=>{
+    o.mesh.position.z += dz;
+    if(!o.hit && Math.abs(o.mesh.position.z - 0) < 0.7 && o.lane===player.laneIdx){
+      const clearedByJump = player.jumping && player.y > 0.9;
+      if(!clearedByJump && player.invincibleT<=0){
+        o.hit = true;
+        player.lives -= 1;
+        player.invincibleT = 1.4;
+        player.speed *= 0.5;
+        flashHit();
+        SFX.hit();
+        if(player.lives <= 0){ player.dead = true; SFX.crash(); }
+      }
+    }
+    o.mesh.rotation.y += dt*0.6;
+  });
+
+  orbs.forEach(o=>{
+    o.mesh.position.z += dz;
+    o.mesh.rotation.y += dt*2;
+    o.mesh.position.y = 1.1 + Math.sin(raceClock*3 + o.z)*0.15;
+    if(!o.collected && Math.abs(o.mesh.position.z - 0) < 0.7 && o.lane===player.laneIdx){
+      o.collected = true;
+      o.mesh.visible = false;
+      player.boost = Math.min(100, player.boost + 22);
+      SFX.collect();
+    }
+  });
+
+  if(finishMarker){
+    finishMarker.position.z += dz;
+  }
+
+  // rivals
+  const MIN_GAP = 3.4; // roughly one dino body-length, so models never interpenetrate
+  rivals.forEach(r=>{
+    r.speed = r.speed + (Math.random()-0.5)*0.15;
+    r.speed = Math.max(8, Math.min(player.maxSpeed*0.98, r.speed));
+    r.distance += r.speed*dt;
+    r.runPhase += dt;
+    // rival world z position: relative to player using distance delta
+    let relative = r.distance - player.distance;
+    if(r.laneIdx === player.laneIdx && Math.abs(relative) < MIN_GAP){
+      // same lane and too close: hold the rival at a safe distance instead
+      // of letting the two models blend into each other
+      relative = relative >= 0 ? MIN_GAP : -MIN_GAP;
+      r.distance = player.distance + relative;
+    }
+    r.model.position.z = -relative; // ahead if relative>0
+    r.model.position.x = LANE_X[r.laneIdx];
+    animateRun(r.model, r.runPhase, r.speed/11);
+  });
+
+  // HUD
+  document.getElementById('distText').textContent = Math.floor(player.distance);
+  document.getElementById('distanceBarFill').style.width = Math.min(100,(player.distance/stage.goal)*100)+'%';
+  document.getElementById('hearts').textContent = '❤'.repeat(Math.max(0,player.lives)) + '♡'.repeat(3-Math.max(0,player.lives));
+  document.getElementById('boostBarFill').style.width = player.boost+'%';
+  document.getElementById('rank').textContent = computeRank();
+
+  // camera follow — chase cam positioned well back so the track and
+  // obstacles are readable, with a subtle, correctly-applied lane-change tilt
+  const camTargetX = player.x*0.5;
+  camera.position.x += (camTargetX - camera.position.x)*Math.min(1,dt*7);
+  camera.position.y = 4.6 + player.y*0.3;
+  camera.position.z = 8.5 - Math.min(1.0, (player.speed-11)*0.04);
+
+  const targetFov = player.boosting ? 58 : 52;
+  camera.fov += (targetFov - camera.fov) * Math.min(1, dt*4);
+  camera.updateProjectionMatrix();
+
+  // lookAt sets the camera's full orientation, so any roll/tilt must be
+  // applied AFTER it (rotateZ composes on top instead of being overwritten)
+  camera.lookAt(player.x*0.35, 2.0, -14);
+
+  const laneVel = player.x - prevLaneX;
+  prevLaneX = player.x;
+  camRoll += ((-laneVel*0.1) - camRoll) * Math.min(1, dt*8);
+  camera.rotateZ(camRoll);
+
+  if(player.dead){
+    endStage(false);
+  } else if(player.distance >= stage.goal){
+    endStage(true);
+  }
+}
+
+let hitFlashT = 0;
+function flashHit(){ hitFlashT = 0.2; }
+
+function animate(){
+  requestAnimationFrame(animate);
+  const dt = Math.min(0.05, clock.getDelta());
+  if(gameState === 'playing'){
+    updatePlaying(dt);
+  }
+  if(hitFlashT>0){
+    hitFlashT -= dt;
+    renderer.setClearColor(0xff2222, Math.max(0,hitFlashT)*0.6);
+  }
+  renderer.render(scene, camera);
+}
+animate();
+
+};
+</script>
+</body>
+</html>
